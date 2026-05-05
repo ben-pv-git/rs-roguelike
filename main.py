@@ -1,17 +1,24 @@
 import pygame as pg
 import time
 from collections import deque
+import heapq
 
 pg.init()
 
+X = 0
+Y = 1
 FPS = 60
 TICK_RATE = 600
 GRID_SIZE = (32, 18)
-X = 0
-Y = 1
 CELL_SIZE = 40
-MARGIN = 1
+MARGIN = 1 
 WINDOW_SIZE = (GRID_SIZE[X] * (CELL_SIZE + MARGIN) + MARGIN, GRID_SIZE[Y] * (CELL_SIZE + MARGIN) + MARGIN)
+
+SCREEN = pg.display.set_mode(WINDOW_SIZE)
+CLOCK = pg.time.Clock()
+NEXT_TICK_TIME = pg.time.get_ticks() + TICK_RATE
+STOPPED = False
+
 BLACK = (0, 0, 0)
 WHITE = (200, 200, 200)
 GREEN = (0, 255, 0)
@@ -19,116 +26,144 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 COLOR_MAP = {0: WHITE, 1: BLUE, 2: GREEN, 3: RED}
 
-SCREEN = pg.display.set_mode(WINDOW_SIZE)
-CLOCK = pg.time.Clock()
-NEXT_TICK_TIME = pg.time.get_ticks() + TICK_RATE
-RUNNING = True
-
 grid = [[0 for _ in range(GRID_SIZE[X])] for _ in range(GRID_SIZE[Y])]
 
 player_pos = [GRID_SIZE[X]//2, GRID_SIZE[Y]//2]
-grid[player_pos[X]][player_pos[Y]] = 1
+grid[player_pos[Y]][player_pos[X]] = 1
 dest_pos = player_pos
 player_is_attacking = False
 player_is_moving = player_pos != dest_pos
 action_queue = deque()
+player_path = None
 
 enemy_pos = [10, 10]
-grid[enemy_pos[X]][enemy_pos[Y]] = 3
+grid[enemy_pos[Y]][enemy_pos[X]] = 3
+enemy_dest_pos = player_pos
+
+class Pathfinder:
+    def __init__(self, grid):
+        self.grid = grid  
+        self.height = len(grid)
+        self.width = len(grid[0])
+
+    def get_neighbors(self, x, y):
+        cardinals = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        diagonals = [(-1, -1), (1, -1), (-1, 1), (1, 1)]
+        neighbors = []
+
+        def is_walkable(tx, ty):
+            if 0 <= tx < self.width and 0 <= ty < self.height:
+                return self.grid[ty][tx] != 4
+            return False
+
+        for dx, dy in cardinals:
+            if is_walkable(x + dx, y + dy):
+                neighbors.append((x + dx, y + dy))
+
+        for dx, dy in diagonals:
+            if is_walkable(x + dx, y + dy):
+                if is_walkable(x + dx, y) and is_walkable(x, y + dy):
+                    neighbors.append((x + dx, y + dy))
+        return neighbors
+
+    def find_path(self, start, target):
+        queue = deque([start])
+        visited = {start: None} 
+        while queue:
+            current = queue.popleft()
+            if current == target:
+                return self.reconstruct_path(visited, target)
+            for neighbor in self.get_neighbors(*current):
+                if neighbor not in visited:
+                    visited[neighbor] = current
+                    queue.append(neighbor)
+        return None
+
+    def reconstruct_path(self, visited, target):
+        path = []
+        curr = target
+        while curr is not None:
+            path.append(curr)
+            curr = visited[curr]
+        return path[::-1]
+
+pf = Pathfinder(grid)
 
 def get_rect(r, c):
-    return [
-        (MARGIN + CELL_SIZE) * c + MARGIN,
-        (MARGIN + CELL_SIZE) * r + MARGIN,
-        CELL_SIZE,
-        CELL_SIZE
-    ]
+    return [(MARGIN + CELL_SIZE) * c + MARGIN, (MARGIN + CELL_SIZE) * r + MARGIN, CELL_SIZE, CELL_SIZE]
 
 def move_player():
-
-    grid[player_pos[X]][player_pos[Y]] = 0 # tile is no longer occupied by the player
-
-    move_speed = 2
-    if abs(player_pos[Y] - dest_pos[Y]) == 1: move_speed = 1
-
-    if player_pos[Y] < dest_pos[Y]: player_pos[Y] += move_speed
-    elif player_pos[Y] > dest_pos[Y]: player_pos[Y] -= move_speed
-
-    move_speed = 2
-    if abs(player_pos[X] - dest_pos[X]) == 1: move_speed = 1
-
-    if player_pos[X] < dest_pos[X]: player_pos[X] += move_speed
-    elif player_pos[X] > dest_pos[X]: player_pos[X] -= move_speed
-    
-    grid[player_pos[X]][player_pos[Y]] = 1
+    if player_path:
+        grid[player_pos[Y]][player_pos[X]] == 0
 
 def attack():
     print("attack")
 
-while RUNNING:
+def move_enemy():
+    grid[enemy_pos[Y]][enemy_pos[X]] = 0 
+    dist_to_player = [enemy_pos[X] - player_pos[X], enemy_pos[Y] - player_pos[Y]]
+    adjacent = (abs(dist_to_player[X]) == 1 and dist_to_player[Y] == 0) or \
+               (abs(dist_to_player[Y]) == 1 and dist_to_player[X] == 0)
+    if not adjacent:
+        move_speed = 1
+        if dist_to_player[Y] != 0:
+            enemy_pos[Y] -= move_speed if dist_to_player[Y] > 0 else -move_speed
+        if dist_to_player[X] != 0:
+            enemy_pos[X] -= move_speed if dist_to_player[X] > 0 else -move_speed
+    grid[enemy_pos[Y]][enemy_pos[X]] = 3
 
+while not STOPPED:
     for event in pg.event.get():
-
         if event.type == pg.QUIT:
-            RUNNING = False
-
+            STOPPED = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             mouse_pos = pg.mouse.get_pos()
             col_coord = mouse_pos[X] // (CELL_SIZE + MARGIN)
             row_coord = mouse_pos[Y] // (CELL_SIZE + MARGIN)
-
-            if not 0 <= row_coord < GRID_SIZE[Y] and 0 <= col_coord < GRID_SIZE[X]:
+            
+            if not (0 <= row_coord < GRID_SIZE[Y] and 0 <= col_coord < GRID_SIZE[X]):
                 continue
 
-            if player_pos == [row_coord, col_coord]:
-                continue
+            click_pos = [col_coord, row_coord]
 
-            if [col_coord, row_coord] == enemy_pos:
+            if click_pos == enemy_pos:
                 if player_pos != dest_pos:
-                    grid[dest_pos[X]][dest_pos[Y]] = 0
+                    grid[dest_pos[Y]][dest_pos[X]] = 0
                 action_queue.append("attack")
                 player_is_attacking = True
                 player_is_moving = False
                 continue
 
-            if dest_pos != [row_coord, col_coord] and dest_pos != player_pos:
-                grid[dest_pos[X]][dest_pos[Y]] = 0
-
-            dest_pos = [row_coord, col_coord]
-            grid[dest_pos[X]][dest_pos[Y]] = 2
+            if dest_pos != click_pos and dest_pos != player_pos:
+                grid[dest_pos[Y]][dest_pos[X]] = 0
+            
+            dest_pos = click_pos
+            grid[dest_pos[Y]][dest_pos[X]] = 2
             action_queue.append("move_player")
-    
+            player_path = deque(pf.find_path(tuple(player_pos), tuple(dest_pos)))
+            print(player_path)
+
 
     current_time = pg.time.get_ticks()
     if current_time > NEXT_TICK_TIME:
-        time.sleep((current_time - NEXT_TICK_TIME) / 1000) # buffer until next tick
-
         if action_queue:
             action = action_queue.popleft()
-
-            if action == "move_player":
-                player_is_moving = True
-
+            if action == "move_player": player_is_moving = True
             if action == "attack" and player_is_attacking:
-
                 player_is_moving = False
                 attack()
                 player_is_attacking = False
         
-        if player_is_moving:
-            move_player()
-                
-
+        if player_is_moving: move_player()
+        move_enemy()
         NEXT_TICK_TIME = current_time + TICK_RATE
-
 
     SCREEN.fill(BLACK)
     for r in range(GRID_SIZE[Y]):
         for c in range(GRID_SIZE[X]):
-            cell_type = grid[r][c]
-            color = COLOR_MAP.get(cell_type, WHITE)
+            color = COLOR_MAP.get(grid[r][c], WHITE)
             pg.draw.rect(SCREEN, color, get_rect(r, c))
-    
+
     pg.display.flip()
     CLOCK.tick(FPS)
 
