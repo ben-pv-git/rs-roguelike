@@ -12,6 +12,7 @@ GRID_SIZE = (18, 32)
 CELL_SIZE = 40
 MARGIN = 1 
 WINDOW_SIZE = (GRID_SIZE[X] * (CELL_SIZE + MARGIN) + MARGIN, GRID_SIZE[Y] * (CELL_SIZE + MARGIN) + MARGIN)
+# WINDOW_SIZE =(GRID_SIZE[X] * CELL_SIZE, GRID_SIZE[Y] * CELL_SIZE)
 
 SCREEN = pg.display.set_mode(WINDOW_SIZE)
 CLOCK = pg.time.Clock()
@@ -53,6 +54,7 @@ pf = Pathfinder(grid)
 
 def get_rect(r, c):
     return [(MARGIN + CELL_SIZE) * c + MARGIN, (MARGIN + CELL_SIZE) * r + MARGIN, CELL_SIZE, CELL_SIZE]
+    # return [CELL_SIZE * c, CELL_SIZE * r, CELL_SIZE, CELL_SIZE]
 
 def move_player():
     global player_pos
@@ -147,10 +149,12 @@ while not STOPPED:
         NEXT_TICK_TIME = current_time + TICK_RATE
 
     SCREEN.fill(BLACK)
+    # SCREEN.fill(WHITE)
     for r in range(GRID_SIZE[Y]):
         for c in range(GRID_SIZE[X]):
             color = COLOR_MAP.get(grid[r][c], WHITE)
             pg.draw.rect(SCREEN, color, get_rect(r, c))
+            # pg.draw.rect(SCREEN, color, get_rect(r, c), MARGIN+2)
 
     pg.display.flip()
     CLOCK.tick(FPS)
