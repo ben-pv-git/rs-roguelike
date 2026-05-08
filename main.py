@@ -1,6 +1,7 @@
 import pygame as pg
 from collections import deque
 from pathfinder import Pathfinder
+from entity import *
 
 pg.init()
 
@@ -37,63 +38,17 @@ grid[6][16] = 4
 grid[7][16] = 4
 grid[8][15] = 4
 
-player_pos = [GRID_SIZE[Y]//2, GRID_SIZE[X]//2]
-grid[player_pos[Y]][player_pos[X]] = 1
-dest_pos = player_pos
-player_is_attacking = False
-player_is_moving = player_pos != dest_pos
-action_queue = deque()
-player_path = None
-player_is_running = True
+Player = Player([GRID_SIZE[Y]//2, GRID_SIZE[X]//2])
+grid[Player.position[Y]][Player.position[X]] = 1
 
-enemy_pos = [10, 10]
-grid[enemy_pos[Y]][enemy_pos[X]] = 3
-enemy_dest_pos = player_pos
+Enemy = Enemy([10, 10])
+grid[Enemy.position[Y]][Enemy.position[X]] = 3
 
-pf = Pathfinder(grid)
+Pathfinder = Pathfinder(grid)
 
 def get_rect(r, c):
     return [(MARGIN + CELL_SIZE) * c + MARGIN, (MARGIN + CELL_SIZE) * r + MARGIN, CELL_SIZE, CELL_SIZE]
     # return [CELL_SIZE * c, CELL_SIZE * r, CELL_SIZE, CELL_SIZE]
-
-def move_player():
-    global player_pos
-    global player_path
-    global grid
-    if player_path:
-        if player_is_running and len(player_path) >= 2:
-            player_path.popleft()
-        grid[player_pos[Y]][player_pos[X]] = 0
-        next = player_path.popleft()
-        grid[next[Y]][next[X]] = 1
-        player_pos = [next[Y], next[X]]
-
-def attack():
-    print("attack")
-
-def move_enemy():
-    global grid
-    global enemy_pos
-    global player_pos
-
-    dist_to_player = [enemy_pos[Y] - player_pos[Y], enemy_pos[X] - player_pos[X]]
-    adjacent = (abs(dist_to_player[Y]) == 1 and dist_to_player[X] == 0) or \
-               (abs(dist_to_player[X]) == 1 and dist_to_player[Y] == 0)
-
-    if adjacent:
-        return
-
-    grid[enemy_pos[Y]][enemy_pos[X]] = 0 
-    move_speed = 1
-    if dist_to_player[Y] != 0:
-        next_y = enemy_pos[Y] - move_speed if dist_to_player[Y] > 0 else enemy_pos[Y] + move_speed
-        if grid[next_y][enemy_pos[X]] != 4:
-            enemy_pos[Y] = next_y
-    if dist_to_player[X] != 0:
-        next_x = enemy_pos[X] - move_speed if dist_to_player[X] > 0 else enemy_pos[X] + move_speed
-        if grid[enemy_pos[Y]][next_x] != 4:
-            enemy_pos[X] = next_x
-    grid[enemy_pos[Y]][enemy_pos[X]] = 3
 
 while not STOPPED:
     for event in pg.event.get():
@@ -109,43 +64,45 @@ while not STOPPED:
 
             click_pos = [col_coord, row_coord]
 
-            if click_pos == enemy_pos:
-                if player_pos != dest_pos:
-                    grid[dest_pos[Y]][dest_pos[X]] = 0
-                action_queue.append("attack")
-                player_is_attacking = True
-                player_is_moving = False
+            if click_pos == Enemy.position:
+                if Player.position != Player.dest_pos:
+                    grid[Player.dest_pos[Y]][Player.dest_pos[X]] = 0
+                Player.action_queue.append("attack")
+                Player.is_attacking = True
+                Player.is_moving = False
                 continue
 
-            if dest_pos != click_pos and dest_pos != player_pos:
-                grid[dest_pos[Y]][dest_pos[X]] = 0
+            if Player.dest_pos != click_pos and Player.dest_pos != Player.position:
+                grid[Player.dest_pos[Y]][Player.dest_pos[X]] = 0
             
-            dest_pos = click_pos
-            grid[dest_pos[Y]][dest_pos[X]] = 2
-            action_queue.append("move_player")
-            path = pf.find_path(tuple(player_pos), tuple(dest_pos))
-            if path:
-                player_path = deque(path)
+            Player.dest_pos = click_pos
+            grid[Player.dest_pos[Y]][Player.dest_pos[X]] = 2
+            Player.action_queue.append("move_player")
+            Player.path = Pathfinder.find_path(tuple(Player.position), tuple(Player.dest_pos))
+            if Player.path:
+                Player.path = deque(Player.path)
                 # Remove the first node since the player is already there
-                player_path.popleft() 
-                grid[dest_pos[Y]][dest_pos[X]] = 2
-                player_is_moving = True
+                Player.path.popleft() 
+                grid[Player.dest_pos[Y]][Player.dest_pos[X]] = 2
+                Player.is_moving = True
             else:
-                player_path = deque()
-                player_is_moving = False
+                Player.path = deque()
+                Player.is_moving = False
 
     current_time = pg.time.get_ticks()
     if current_time > NEXT_TICK_TIME:
-        if action_queue:
-            action = action_queue.popleft()
-            if action == "move_player": player_is_moving = True
-            if action == "attack" and player_is_attacking:
-                player_is_moving = False
-                attack()
-                player_is_attacking = False
+        if Player.action_queue:
+            action = Player.action_queue.popleft()
+            if action == "move_player":
+                Player.is_moving = True
+            if action == "attack":
+                Player.is_moving = False
+                Player.attack()
+                Player.is_attacking = False
         
-        if player_is_moving: move_player()
-        move_enemy()
+        if Player.is_moving: Player.move(grid)
+        Enemy.move(grid, Player.position)
+
         NEXT_TICK_TIME = current_time + TICK_RATE
 
     SCREEN.fill(BLACK)
