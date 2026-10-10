@@ -11,18 +11,18 @@ class Pathfinder:
         diagonals = [(-1, -1), (1, -1), (-1, 1), (1, 1)]
         neighbors = []
 
-        def is_walkable(ty, tx):
+        def _is_walkable(ty, tx):
             if 0 <= tx < self.width and 0 <= ty < self.height:
                 return self.grid[ty][tx] != 4
             return False
 
         for dy, dx in cardinals:
-            if is_walkable(y + dy, x + dx):
+            if _is_walkable(y + dy, x + dx):
                 neighbors.append((y + dy, x + dx))
 
         for dy, dx in diagonals:
-            if is_walkable(y + dy, x + dx):
-                if is_walkable(y + dy, x) and is_walkable(y, x + dx):
+            if _is_walkable(y + dy, x + dx):
+                if _is_walkable(y + dy, x) and _is_walkable(y, x + dx):
                     neighbors.append((y + dy, x + dx))
         return neighbors
 
