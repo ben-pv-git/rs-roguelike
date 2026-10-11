@@ -1,33 +1,43 @@
-from pathfinder import Pathfinder
-from collections import deque
-from constants import X, Y, GRID_STATES
+import pygame as pg
+from constants import X, Y, GRID_STATES, GRID_SIZE, CELL_SIZE, MARGIN, COLOR_MAP, SCREEN, BLACK, WHITE
 from entity import Player
 
+def get_rect(r, c):
+    return [
+        (MARGIN + CELL_SIZE) * c + MARGIN,
+        (MARGIN + CELL_SIZE) * r + MARGIN,
+        CELL_SIZE,
+        CELL_SIZE
+    ]
+
+def get_click_pos():
+    mouse_pos = pg.mouse.get_pos()
+    col_coord = mouse_pos[X] // (CELL_SIZE + MARGIN)
+    row_coord = mouse_pos[Y] // (CELL_SIZE + MARGIN)
+    is_out_of_bounds = (
+        col_coord < 0 or col_coord >= GRID_SIZE[Y] or 
+        row_coord < 0 or row_coord >= GRID_SIZE[X]
+    )
+    return [col_coord, row_coord], is_out_of_bounds
+
 def handle_left_click(player: Player, grid, click_pos):
-    pf = Pathfinder(grid)
-    if player.dest_pos != [None, None] and player.dest_pos != click_pos and player.dest_pos != player.position:
+    if player.is_moving and player.dest_pos != click_pos:
         grid[player.dest_pos[Y]][player.dest_pos[X]] = GRID_STATES["empty"]
     player.dest_pos = click_pos
     grid[player.dest_pos[Y]][player.dest_pos[X]] = GRID_STATES["player_dest"]
-    player.action_queue.append("move_player")
-    player.path = pf.find_path(tuple(player.position), tuple(player.dest_pos))
-    if player.path:
-        player.path = deque(player.path)
-        # remove the first node since the player is already there
-        player.path.popleft()
-        grid[player.dest_pos[Y]][player.dest_pos[X]] = GRID_STATES["player_dest"]
-        player.is_moving = True
-    else:
-        player.path = deque()
-        player.is_moving = False
+    player.find_path(grid)
+    player.action_queue.extend(["move_player"] * len(player.path))
+
+def draw_grid(grid):
+    SCREEN.fill(BLACK)
+    # SCREEN.fill(WHITE)
+    for r in range(GRID_SIZE[Y]):
+        for c in range(GRID_SIZE[X]):
+            color = COLOR_MAP.get(grid[r][c], WHITE)
+            pg.draw.rect(SCREEN, color, get_rect(r, c))
+            # pg.draw.rect(SCREEN, color, get_rect(r, c), MARGIN+2)
 
 def draw_wall(grid):
-    grid[0][16] = 4
-    grid[1][16] = 4
-    grid[2][16] = 4
-    grid[3][16] = 4
-    grid[4][16] = 4
-    grid[5][16] = 4
-    grid[6][16] = 4
-    grid[7][16] = 4
-    grid[8][15] = 4
+    for x in range(0, 8):
+        grid[x][16] = GRID_STATES["wall"]
+    grid[8][15] = GRID_STATES["wall"]

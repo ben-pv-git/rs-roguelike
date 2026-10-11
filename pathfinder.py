@@ -41,8 +41,8 @@ class Pathfinder:
 
     def reconstruct_path(self, visited, target):
         path = []
-        curr = target
-        while curr is not None:
-            path.append(curr)
-            curr = visited[curr]
+        current = target
+        while current is not None:
+            path.append(current)
+            current = visited[current]
         return path[::-1]

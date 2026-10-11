@@ -11,7 +11,6 @@ WINDOW_SIZE = (GRID_SIZE[X] * (CELL_SIZE + MARGIN) + MARGIN, GRID_SIZE[Y] * (CEL
 
 SCREEN = pg.display.set_mode(WINDOW_SIZE)
 CLOCK = pg.time.Clock()
-NEXT_TICK_TIME = pg.time.get_ticks() + TICK_RATE
 STOPPED = False
 
 GRID_STATES = {
@@ -34,3 +33,6 @@ COLOR_MAP = {
     GRID_STATES["enemy"]: RED,
     GRID_STATES["wall"]: BLACK
 }
+
+PLAYER_STARTING_POS = [GRID_SIZE[Y]//2, GRID_SIZE[X]//2]
+ENEMY_STARTING_POS = [10, 10]
